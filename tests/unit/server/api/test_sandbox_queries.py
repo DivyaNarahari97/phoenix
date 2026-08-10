@@ -106,21 +106,29 @@ async def test_sandbox_providers_returns_nested_configs(
         SANDBOX_ADAPTER_METADATA[provider.backend_type].supported_languages
     )
     assert provider_result["enabled"] is True
-    assert provider_result["configs"] == [
-        {
-            "id": str(GlobalID("SandboxConfig", str(sandbox_config.id))),
-            "name": sandbox_config.name.root,
-            "description": sandbox_config.description,
-            "language": sandbox_config.language,
-            "timeout": sandbox_config.timeout,
-            "enabled": sandbox_config.enabled,
-            "config": {
-                "envVars": [],
-                "internetAccess": None,
-                "dependencies": None,
-            },
-        }
-    ]
+
+    # The provider owns more than this fixture's config: the facilitator seeds a
+    # default config for every auto-seedable adapter whose runtime is importable,
+    # so WASM also carries `default-wasm-python` wherever wasmtime is installed.
+    # Asserting the whole list would make this test pass only in environments
+    # missing the sandbox runtimes. Select the config under test by id instead —
+    # its contents are still asserted exactly.
+    configs_by_id = {config["id"]: config for config in provider_result["configs"]}
+    config_id = str(GlobalID("SandboxConfig", str(sandbox_config.id)))
+    assert config_id in configs_by_id
+    assert configs_by_id[config_id] == {
+        "id": config_id,
+        "name": sandbox_config.name.root,
+        "description": sandbox_config.description,
+        "language": sandbox_config.language,
+        "timeout": sandbox_config.timeout,
+        "enabled": sandbox_config.enabled,
+        "config": {
+            "envVars": [],
+            "internetAccess": None,
+            "dependencies": None,
+        },
+    }
 
 
 async def test_sandbox_backends_and_providers_can_be_loaded_together(
