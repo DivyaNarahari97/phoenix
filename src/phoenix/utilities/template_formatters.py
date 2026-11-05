@@ -268,6 +268,25 @@ class _SafeFieldFormatter(Formatter):
         return obj, first
 
 
+def _reject_automatic_field_numbering(template: str) -> None:
+    """Raise ``TemplateFormatterError`` if the template uses automatic field numbering.
+
+    Variables are supplied by name, so there are no positional arguments for a bare
+    ``"{}"`` to draw from and formatting would surface a raw ``IndexError`` instead of
+    the ``TemplateFormatterError`` this module documents. ``parse`` also cannot report
+    it as a missing variable, because the field has no name.
+
+    A literal pair of braces is written ``"{{}}"``.
+    """
+    for _, field_name, _, _ in Formatter().parse(template):
+        if field_name == "":
+            raise TemplateFormatterError(
+                "F-string templates must name their variables: '{}' uses automatic "
+                "field numbering, which has no value to draw from. Use '{name}' to "
+                "substitute a variable, or '{{}}' for a literal '{}'."
+            )
+
+
 class FStringTemplateFormatter(TemplateFormatter):
     """
     Regular f-string template formatter.
@@ -304,6 +323,7 @@ class FStringTemplateFormatter(TemplateFormatter):
     _formatter = _SafeFieldFormatter()
 
     def _format(self, template: str, variable_names: Iterable[str], **variables: Any) -> str:
+        _reject_automatic_field_numbering(template)
         # Wrap dict and list variables to support attribute access (e.g., {user.name})
         wrapped_variables = {key: _wrap_value(value) for key, value in variables.items()}
         return self._formatter.vformat(template, (), wrapped_variables)

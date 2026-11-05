@@ -7,6 +7,7 @@ from phoenix.client.utils.template_formatters import (
     MustacheBaseTemplateFormatter,
     NoOpFormatterBase,
     TemplateFormatter,
+    TemplateFormatterError,
 )
 
 
@@ -105,6 +106,27 @@ from phoenix.client.utils.template_formatters import (
             id="fstring-value-is-variable-name",
         ),
         pytest.param(
+            FStringBaseTemplateFormatter,
+            "{{}}",
+            {},
+            "{}",
+            id="fstring-escaped-empty-braces-are-literal",
+        ),
+        pytest.param(
+            FStringBaseTemplateFormatter,
+            "Return {{}} when nothing matches",
+            {},
+            "Return {} when nothing matches",
+            id="fstring-escaped-empty-braces-in-prose",
+        ),
+        pytest.param(
+            FStringBaseTemplateFormatter,
+            "{hello:>5}",
+            {"hello": "x"},
+            "    x",
+            id="fstring-format-spec-is-preserved",
+        ),
+        pytest.param(
             NoOpFormatterBase,
             "Hello, world!",
             {},
@@ -122,3 +144,26 @@ def test_formatters_produce_expected_output(
     formatter = formatter_cls()
     output = formatter.format(template, variables=variables)
     assert output == expected_output
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        pytest.param("{}", id="only-an-empty-field"),
+        pytest.param("Return {} when nothing matches", id="empty-field-in-prose"),
+        pytest.param("{} {}", id="two-empty-fields"),
+        pytest.param("{hello} {}", id="named-field-then-empty-field"),
+    ],
+)
+def test_fstring_automatic_field_numbering_raises_template_formatter_error(
+    template: str,
+) -> None:
+    """Automatic field numbering has no value to draw from, so it must be reported.
+
+    `variables` is a name-to-value mapping, so `str.format` previously surfaced a raw
+    `IndexError` ("Replacement index 0 out of range") rather than the documented
+    `TemplateFormatterError`.
+    """
+    formatter = FStringBaseTemplateFormatter()
+    with pytest.raises(TemplateFormatterError, match=r"automatic field numbering"):
+        formatter.format(template, variables={"hello": "world"})

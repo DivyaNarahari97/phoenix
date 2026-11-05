@@ -89,6 +89,25 @@ class NoOpFormatterBase(BaseTemplateFormatter):
         return template
 
 
+def _reject_automatic_field_numbering(template: str) -> None:
+    """Raise ``TemplateFormatterError`` if the template uses automatic field numbering.
+
+    ``variables`` maps names to values, so there are no positional arguments for a
+    bare ``"{}"`` to draw from and ``str.format`` would surface a raw ``IndexError``
+    instead of the ``TemplateFormatterError`` this module documents. ``parse`` also
+    cannot report it as a missing variable, because the field has no name.
+
+    A literal pair of braces is written ``"{{}}"``.
+    """
+    for _, field_name, _, _ in string.Formatter().parse(template):
+        if field_name == "":
+            raise TemplateFormatterError(
+                "F-string templates must name their variables: '{}' uses automatic "
+                "field numbering, which has no value to draw from. Use '{name}' to "
+                "substitute a variable, or '{{}}' for a literal '{}'."
+            )
+
+
 class FStringBaseTemplateFormatter(BaseTemplateFormatter):
     """F-string style template formatter using Python string formatting.
 
@@ -113,6 +132,7 @@ class FStringBaseTemplateFormatter(BaseTemplateFormatter):
         variable_names: Iterable[str],
         variables: Mapping[str, str] = MappingProxyType({}),
     ) -> str:
+        _reject_automatic_field_numbering(template)
         return template.format(**variables)
 
 

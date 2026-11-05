@@ -187,6 +187,44 @@ def test_template_formatters_raise_expected_error_on_missing_variables(
         formatter.format(template)
 
 
+class TestFStringAutomaticFieldNumbering:
+    """Automatic field numbering cannot be satisfied by name-keyed variables."""
+
+    @pytest.mark.parametrize(
+        "template",
+        (
+            pytest.param("{}", id="only-an-empty-field"),
+            pytest.param("Return {} when nothing matches", id="empty-field-in-prose"),
+            pytest.param("{} {}", id="two-empty-fields"),
+            pytest.param("{hello} {}", id="named-field-then-empty-field"),
+        ),
+    )
+    def test_empty_field_raises_template_formatter_error(self, template: str) -> None:
+        """Previously surfaced a raw `IndexError: tuple index out of range`.
+
+        `parse` cannot report an unnamed field as a missing variable, so the template
+        reached `vformat` with no positional arguments to consume.
+        """
+        formatter = FStringTemplateFormatter()
+        with pytest.raises(TemplateFormatterError, match=r"automatic field numbering"):
+            formatter.format(template, hello="world")
+
+    @pytest.mark.parametrize(
+        "template, expected",
+        (
+            pytest.param("{{}}", "{}", id="escaped-empty-braces-are-literal"),
+            pytest.param(
+                "Return {{}} when nothing matches",
+                "Return {} when nothing matches",
+                id="escaped-empty-braces-in-prose",
+            ),
+        ),
+    )
+    def test_escaped_braces_still_render_literally(self, template: str, expected: str) -> None:
+        formatter = FStringTemplateFormatter()
+        assert formatter.format(template) == expected
+
+
 class TestFStringFormatStringInjection:
     """Regression tests for the f-string format-string injection vulnerability."""
 
